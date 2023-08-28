@@ -2,9 +2,10 @@ package service_user
 
 import (
 	"errors"
-	"github.com/eneassena10/estoque-go/internal/domain/user/domain"
 
-	"github.com/eneassena10/estoque-go/pkg/store"
+	"github.com/eneassena10/go-api-estoque/internal/domain/user/domain"
+
+	"github.com/eneassena10/go-api-estoque/pkg/store"
 	"github.com/gin-gonic/gin"
 )
 

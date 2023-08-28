@@ -1,1 +1,1 @@
-# estoque-go
+# go-api-estoque

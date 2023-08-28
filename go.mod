@@ -1,9 +1,13 @@
-module github.com/eneassena10/estoque-go
+module github.com/eneassena10/go-api-estoque
 
 go 1.19
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/gin-gonic/gin v1.9.0
+	github.com/go-sql-driver/mysql v1.7.1
+	github.com/golang/mock v1.6.0
+	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.8.1
 )
 

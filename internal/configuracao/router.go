@@ -1,41 +1,37 @@
 package configuracao
 
 import (
-	productControllers "github.com/eneassena10/estoque-go/internal/domain/product/controllers"
-	userControllers "github.com/eneassena10/estoque-go/internal/domain/user/controllers"
-	"github.com/eneassena10/estoque-go/pkg/store"
+	"log"
+
+	productControllers "github.com/eneassena10/go-api-estoque/internal/domain/product/controllers"
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	// Products - rotas de listagem e criação de um novo produto
-	Products = "/products"
-
-	// ProductsID - usado em rotas que usa o id do produto para uma alteração e leitura
-	ProductsList = "/products/list"
-)
-
-type App struct {
-	fileStore store.IStore
-	products  productControllers.IControllers
-	user      userControllers.IUserController
-}
-type IApp interface {
-	InitApp(router *gin.Engine)
+type ControllersEntrypoint struct {
+	ProductController productControllers.IControllers
 }
 
-func NewApp(fs store.IStore, products productControllers.IControllers, user userControllers.IUserController) IApp {
-	return &App{fileStore: fs, products: products, user: user}
+func NewHandlers(productController any) *ControllersEntrypoint {
+	return &ControllersEntrypoint{
+		ProductController: productController.(productControllers.IControllers),
+	}
 }
 
-func (a *App) InitApp(router *gin.Engine) {
-	router.GET(Products, a.products.GetProductsByID)
-	router.GET(ProductsList, a.products.GetProductsAll)
-	router.DELETE(Products, a.products.DeleteProducts)
-	router.POST(Products, a.products.CreateProducts)
-	router.PATCH(Products, a.products.UpdateProductsCount)
+func filterQuery(ctx *gin.Context) {
+	id := ctx.Query("id")
+	if id == "" {
+		log.Println("field id required")
+	} else {
+		log.Println("fields id:" + id)
+	}
+}
 
-	router.POST("user/login", a.user.Logar)
-	router.POST("user/logout", a.user.Logout)
-	router.POST("user/create", a.user.Create)
+func (h *ControllersEntrypoint) MapRoutes(router *gin.Engine) {
+	g := router.Group("api/v1", filterQuery)
+	g.GET("/product", h.ProductController.GetProductsByID)
+	g.GET("products", h.ProductController.GetProductsAll)
+	g.DELETE("/products", h.ProductController.DeleteProducts)
+	g.POST("/products", h.ProductController.CreateProducts)
+	g.PATCH("/products", h.ProductController.UpdateProductsCount)
+
 }

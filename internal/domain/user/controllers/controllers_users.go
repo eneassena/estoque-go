@@ -1,8 +1,9 @@
 package controllers
 
 import (
-	"github.com/eneassena10/estoque-go/internal/domain/user/domain"
 	"net/http"
+
+	"github.com/eneassena10/go-api-estoque/internal/domain/user/domain"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,14 +1,13 @@
 package controllers
 
 import (
-	"database/sql"
 	"net/http"
 
-	"github.com/eneassena10/estoque-go/internal/domain/product/entities"
-	"github.com/eneassena10/estoque-go/internal/domain/product/repository"
-	"github.com/eneassena10/estoque-go/internal/domain/product/service"
-
-	"github.com/eneassena10/estoque-go/pkg/store"
+	productservicecreate "github.com/eneassena10/go-api-estoque/internal/domain/product/service/product_service_create"
+	productservicedelete "github.com/eneassena10/go-api-estoque/internal/domain/product/service/product_service_delete"
+	productservicefindall "github.com/eneassena10/go-api-estoque/internal/domain/product/service/product_service_find_all"
+	productservicefindbyid "github.com/eneassena10/go-api-estoque/internal/domain/product/service/product_service_find_by_id"
+	productserviceupdatecount "github.com/eneassena10/go-api-estoque/internal/domain/product/service/product_service_update"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,149 +23,95 @@ type IControllers interface {
 Controllers de Products
 */
 type Controllers struct {
-	FileStore store.IStore
-	database  *sql.DB
-	Service   entities.IPoductService
+	ProductServiceGetAll      productservicefindall.IProductServiceFindAll
+	ProductServiceFindByID    productservicefindbyid.IProductServiceFindByID
+	ProductServiceCreate      productservicecreate.IProductServiceCreate
+	ProductServiceUpdateCount productserviceupdatecount.IProductServiceUpdateCount
+	ProductServiceDelete      productservicedelete.IProductServiceDelete
 }
 
-func NewControllers(fileStore store.IStore, database *sql.DB) IControllers {
-	r := repository.NewProductRepository(database)
-	s := service.NewProductService(r)
+func NewControllers(
+	productServiceGetById productservicefindbyid.IProductServiceFindByID,
+	productServiceGetAll productservicefindall.IProductServiceFindAll,
+	productServiceCreate productservicecreate.IProductServiceCreate,
+	productServiceUpdateCount productserviceupdatecount.IProductServiceUpdateCount,
+	productServiceDelete productservicedelete.IProductServiceDelete,
+) IControllers {
 	return &Controllers{
-		FileStore: fileStore,
-		Service:   s,
+		ProductServiceGetAll:      productServiceGetAll,
+		ProductServiceFindByID:    productServiceGetById,
+		ProductServiceCreate:      productServiceCreate,
+		ProductServiceUpdateCount: productServiceUpdateCount,
+		ProductServiceDelete:      productServiceDelete,
 	}
 }
 
 func (c *Controllers) GetProductsAll(ctx *gin.Context) {
-	// var productFileJson *entities.ProductRequest
-	// if err := c.FileStore.Read(&productFileJson); err != nil {
-	// 	ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-	// 	return
-	// }
-	products := c.Service.GetProductsAll(ctx)
+	products := c.ProductServiceGetAll.Execute()
 
-	ctx.JSON(http.StatusOK, Response{http.StatusOK, products})
+	response := Response{Code: http.StatusOK, CountItems: len(products), Data: products}
+	ctx.JSON(response.Code, response)
 }
 
 func (c *Controllers) GetProductsByID(ctx *gin.Context) {
-	var p *entities.ProductRequest
-	if err := ctx.BindJSON(&p); err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
+	var productByID ProductRequestByID
+
+	if err := ctx.BindJSON(&productByID); err != nil {
+		response := Response{Code: http.StatusInternalServerError, Data: err.Error()}
+		ctx.JSON(response.Code, response)
+		return
+	}
+	productResult := c.ProductServiceFindByID.Execute(productservicefindbyid.ProductInputFindByID(productByID))
+	if productResult == nil {
+		response := Response{Code: http.StatusNoContent, Data: nil}
+		ctx.JSON(response.Code, response)
 		return
 	}
 
-	product := c.getProductByProductID(p)
-	if product == nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, nil})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, Response{http.StatusOK, product})
+	response := Response{Code: http.StatusOK, Data: productResult}
+	ctx.JSON(response.Code, response)
 }
 
 func (c *Controllers) CreateProducts(ctx *gin.Context) {
-	var productRequest *entities.ProductRequest
-	err := ctx.ShouldBindJSON(&productRequest)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
+	var productRequest ProductRequestCreate
+
+	if err := ctx.ShouldBindJSON(&productRequest); err != nil {
+		response := Response{Code: http.StatusInternalServerError, Data: err.Error()}
+		ctx.AbortWithStatusJSON(response.Code, response)
 		return
 	}
 
-	var productList []*entities.ProductRequest
-	err = c.FileStore.Read(&productList)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
+	c.ProductServiceCreate.Execute(productservicecreate.ProductInputCreate(productRequest))
 
-	if len(productList) > 0 {
-		productRequest.ID = productList[len(productList)-1].ID + 1
-	} else {
-		productRequest.ID = 1
-	}
-	productList = append(productList, productRequest)
-	err = c.FileStore.Write(&productList)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, Response{http.StatusOK, productRequest})
+	response := Response{Code: http.StatusNoContent, Data: nil}
+	ctx.JSON(response.Code, response)
 }
 
 func (c *Controllers) UpdateProductsCount(ctx *gin.Context) {
-	var product *entities.ProductRequest
+	var product ProductRequestUpdateCount
 	if err := ctx.BindJSON(&product); err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
+		response := Response{Code: http.StatusInternalServerError, Data: err.Error()}
+		ctx.JSON(response.Code, response)
 		return
 	}
 
-	var productList []*entities.ProductRequest
-	err := c.FileStore.Read(&productList)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
+	c.ProductServiceUpdateCount.Execute(productserviceupdatecount.ProductInputUpdateCount(product))
 
-	for _, p := range productList {
-		if p.ID == product.ID && (p.Quantidade+product.Quantidade) >= 0 {
-			p.Quantidade += product.Quantidade
-			product = p
-			break
-		}
-	}
-
-	if err := c.FileStore.Write(&productList); err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, Response{http.StatusOK, product})
+	response := Response{Code: http.StatusNoContent, Data: nil}
+	ctx.JSON(response.Code, response)
 }
 
 func (c *Controllers) DeleteProducts(ctx *gin.Context) {
-	var product *entities.ProductRequest
+	var product ProductRequestByID
 
 	if err := ctx.BindJSON(&product); err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
-	pList, err := c.loadListProducts()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
+		response := Response{Code: http.StatusInternalServerError, Data: err.Error()}
+		ctx.JSON(response.Code, response)
 		return
 	}
 
-	for i, p := range pList {
-		if p.ID == product.ID {
-			pList = append(pList[:i], pList[i+1:]...)
-		}
-	}
+	c.ProductServiceDelete.Execute(productservicedelete.ProductInputDelete(product))
 
-	err = c.FileStore.Write(&pList)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, Response{http.StatusInternalServerError, err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusNoContent, nil)
-}
-
-func (c *Controllers) getProductByProductID(product *entities.ProductRequest) *entities.ProductRequest {
-	products, _ := c.loadListProducts()
-	for _, p := range products {
-		if p.ID == product.ID {
-			return p
-		}
-	}
-	return nil
-}
-
-func (c *Controllers) loadListProducts() ([]*entities.ProductRequest, error) {
-	var p []*entities.ProductRequest
-	if err := c.FileStore.Read(&p); err != nil {
-		return p, err
-	}
-	return p, nil
+	response := Response{Code: http.StatusNoContent, Data: nil}
+	ctx.JSON(response.Code, response)
 }
